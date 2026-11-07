@@ -27,7 +27,7 @@
 bool rxFlag = false;
 bool overflow = false;
 void rx_callback() {
-	if(rxFlag) overflow = true;
+	if (rxFlag) overflow = true;
 	rxFlag = true;
 }
 
@@ -39,49 +39,50 @@ WiFiServer server(23); // serial studio defaults to port 23 (telnet port)
 
 QueueHandle_t queue_test;
 
-void send_stuff(WiFiClient *client) {
-	const char *thing = "HTTP/1.1 200 OK\nContent-type: text/html\nConnection: close\n\nI am some very useful data\n";
+void send_stuff(WiFiClient* client) {
+	const char* thing = "HTTP/1.1 200 OK\nContent-type: text/html\nConnection: close\n\nI am some very useful data\n";
 	client->println(thing);
 
 }
 
 #define MAX_CLIENTS 8
 void loop_wifi(void*) {
-	WiFiClient *clients[MAX_CLIENTS] = { NULL };
+	WiFiClient* clients[MAX_CLIENTS] = { NULL };
 	bool newData = false;
 	rxdata_t currentData;
-	for(;;) {
+	for (;;) {
 
 		WiFiClient newClient = server.available();
-		if(newClient) {
+		if (newClient) {
 			bool foundSpot = false;
-			for(int i = 0; i < MAX_CLIENTS; ++i) {
-				if(clients[i] == NULL) { // found an empty spot
+			for (int i = 0; i < MAX_CLIENTS; ++i) {
+				if (clients[i] == NULL) { // found an empty spot
 					clients[i] = new WiFiClient(newClient); // copy the new client into the array
 					foundSpot = true;
 					break;
 				}
 			}
-			if(!foundSpot) {
+			if (!foundSpot) {
 				// TODO: too many clients error
 			}
 		}
 
 		// free old data before receiving new
-		if(newData && currentData.data) free(currentData.data);
+		if (newData && currentData.data) free(currentData.data);
 		newData = false;
-		if(xQueueReceive(queue_test, &currentData, 0) == pdPASS) {
+		if (xQueueReceive(queue_test, &currentData, 0) == pdPASS) {
 			newData = true;
-		} else {
+		}
+		else {
 			// TODO: rxdata was null?
 		}
 
-		if(uxQueueMessagesWaiting(queue_test) > 2) {
+		if (uxQueueMessagesWaiting(queue_test) > 2) {
 			both.println("Falling behind, message skipping");
 			xQueueReset(queue_test);
 		}
 
-		if(newData) {
+		if (newData) {
 
 			char buf[200];
 			make_csv(buf, 200, currentData);
@@ -89,10 +90,10 @@ void loop_wifi(void*) {
 			Serial.println(buf);
 
 			// send the csv we just made to all the clients
-			for(int i = 0; i < MAX_CLIENTS; ++i) {
-				WiFiClient *client = clients[i];
-				if(client) {
-					if(!client->connected()) {
+			for (int i = 0; i < MAX_CLIENTS; ++i) {
+				WiFiClient* client = clients[i];
+				if (client) {
+					if (!client->connected()) {
 						delete clients[i]; // we made a copy before, delete it
 						clients[i] = NULL; // remove disconnected client from array
 						continue;
@@ -107,16 +108,17 @@ void loop_wifi(void*) {
 
 void setup() {
 
+
+	Serial.begin(115200);
+
+	heltec_setup();
+	heltec_ve(true);
+
 	RadioLibCRCInstance.size = 16;
 	RadioLibCRCInstance.poly = 0x755B;
 	RadioLibCRCInstance.init = 0xFFFF;
 	RadioLibCRCInstance.out = 0x0000;
 
-Serial.begin(115200);
-
-	heltec_setup();
-	heltec_ve(true);
-	
 	pinMode(SPEED_SWITCH_PIN, INPUT_PULLUP);
 	speedSwitchState = digitalRead(SPEED_SWITCH_PIN);
 
@@ -124,7 +126,7 @@ Serial.begin(115200);
 	radio.begin(FREQUENCY, speedSwitchState ? BANDWIDTH_SLOW : BANDWIDTH_FAST, speedSwitchState ? SPREADING_FACTOR_SLOW : SPREADING_FACTOR_FAST, 7, 0x13, 0, 8);
 	both.println(speedSwitchState ? "SLOW" : "FAST");
 
-	if(radio.setCRC(0) == RADIOLIB_ERR_INVALID_CRC_CONFIGURATION) {
+	if (radio.setCRC(0) == RADIOLIB_ERR_INVALID_CRC_CONFIGURATION) {
 		both.println("bad bad bad");
 	}
 	//radio.beginFSK(434.0, 2.4, 4.5, 156.2, 0, 512);
@@ -136,7 +138,7 @@ Serial.begin(115200);
 	both.print("Wifi init... ");
 
 	TaskHandle_t wifiHandle = NULL;
-	if(WiFi.softAP("NJIT Highlander Racing", "password123")) {
+	if (WiFi.softAP("NJIT Highlander Racing", "password123")) {
 		both.println("success.");
 		IPAddress ip = WiFi.softAPIP();
 		both.print("IP: ");
@@ -144,40 +146,42 @@ Serial.begin(115200);
 		server.begin();
 		usingWifi = true;
 		xTaskCreate(
-				loop_wifi,
-				"wifi loop",
-				10000,
-				NULL,
-				0,
+			loop_wifi,
+			"wifi loop",
+			10000,
+			NULL,
+			0,
 
-				&wifiHandle
-			   );
-	} else {
+			&wifiHandle
+		);
+	}
+	else {
 		both.println("failure.");
 	}
 
 
 
 	queue_test = xQueueCreate(16, sizeof(rxdata_t));
-	if(!queue_test) { both.println("QUEUE ERROR"); return; }
+	if (!queue_test) { both.println("QUEUE ERROR"); return; }
 
 }
 
 void loop() {
 	heltec_loop();
 
-	if(overflow) {
+	if (overflow) {
 		both.println("o");
 	}
 
 	bool newSwitchState;
-	if((newSwitchState = digitalRead(SPEED_SWITCH_PIN)) != speedSwitchState) {
+	if ((newSwitchState = digitalRead(SPEED_SWITCH_PIN)) != speedSwitchState) {
 		speedSwitchState = newSwitchState;
-		if(!speedSwitchState) {
+		if (!speedSwitchState) {
 			radio.setBandwidth(BANDWIDTH_FAST);
 			radio.setSpreadingFactor(SPREADING_FACTOR_FAST);
 			display.println("-> FAST");
-		} else {
+		}
+		else {
 			radio.setBandwidth(BANDWIDTH_SLOW);
 			radio.setSpreadingFactor(SPREADING_FACTOR_SLOW);
 			display.println("-> SLOW");
@@ -185,12 +189,12 @@ void loop() {
 	}
 
 	// rxFlag is set by a radio interrupt if we received something 
-	if(rxFlag) {
+	if (rxFlag) {
 		size_t packetLen = radio.getPacketLength();
 
 		// this will contain the useful data and the crc
-		char *allrxdata = (char*)malloc(packetLen);
-		if(!allrxdata) {// TODO: malloc failed	
+		char* allrxdata = (char*)malloc(packetLen);
+		if (!allrxdata) {// TODO: malloc failed	
 		}
 
 		radio.readData((uint8_t*)allrxdata, packetLen);
@@ -202,7 +206,7 @@ void loop() {
 
 		bool passed = checksum.intVal == (uint16_t)RadioLibCRCInstance.checksum((const uint8_t*)allrxdata, packetLen - 2);
 
-		if(!passed) {
+		if (!passed) {
 			// this code will run if we received a packet that failed the checksum
 			// really no reason to do anything, a corrupted packet is as good as if we didn't get it at all
 
@@ -216,7 +220,8 @@ void loop() {
 			rxdata_struct.length = 17;
 			rxdata_struct.data = errmsg_copy;
 			xQueueSendToBack(queue_test, &rxdata_struct, 0);*/
-		} else if(_radiolib_status == RADIOLIB_ERR_NONE) {
+		}
+		else if (_radiolib_status == RADIOLIB_ERR_NONE) {
 			//both.printf("SNR: %.2f\n", radio.getSNR());
 			//both.printf("%s\n", rxdata);
 
@@ -227,13 +232,13 @@ void loop() {
 			rxdata_struct.length = dataLen;
 
 			// this contains just the useful data (the crc at the end is gone)
-			char *rxdata = (char*)realloc((void*)allrxdata, dataLen);
-			if(rxdata == NULL) { // if this happens we're all screwed
+			char* rxdata = (char*)realloc((void*)allrxdata, dataLen);
+			if (rxdata == NULL) { // if this happens we're all screwed
 				both.println("bad bad bad");
 			}
 
 			rxdata_struct.data = rxdata; // the queue receiver is responsible for freeing the rxdata_struct.data
-						// if the queue overflows then oops memory leak TODO fix!!!!!
+			// if the queue overflows then oops memory leak TODO fix!!!!!
 			xQueueSendToBack(queue_test, &rxdata_struct, 0);
 		}
 		radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF);

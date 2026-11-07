@@ -3,7 +3,7 @@
 
 typedef struct {
 	size_t length;
-	char *data;
+	char* data;
 } rxdata_t;
 
 union crc_value {

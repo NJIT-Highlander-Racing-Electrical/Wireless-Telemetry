@@ -4,11 +4,7 @@
 #ifndef BAJA_DATA_COMPRESSION_H
 #define BAJA_DATA_COMPRESSION_H
 
-// unused, this is used for pack/unpack_all_data
-//#define DATA_SIZE_BITS 210
-
-// bit field for sent data points
-#define SENT_DATA_POINTS_BITS 9
+#define SENT_DATA_POINTS_BITS 11
 typedef uint16_t sent_data_points_t;
 
 #define CVT_DATA           0b1
@@ -19,18 +15,20 @@ typedef uint16_t sent_data_points_t;
 #define GYRO_DATA          0b100000
 #define GPS_LAT_LONG       0b1000000
 #define GPS_OTHER_DATA     0b10000000
+#define BATTERY_DATA       0b100000000
+#define SD_LOGGING_DATA    0b1000000000
 
-// units: rpm, degrees ?
-#define CVT_DATA_TOTAL_BITS 26
+#define CVT_DATA_TOTAL_BITS 42
 #define CVT_RPM_BITS 9
 #define CVT_TEMP_BITS 8
 typedef struct {
 	uint16_t primary : CVT_RPM_BITS;
 	uint16_t secondary : CVT_RPM_BITS;
 	uint8_t temperature;
+	uint8_t secondaryTemperature;
+	uint8_t beltTemperature;
 } cvt_data_t;
 
-// units: rpm
 #define WHEEL_SPEEDS_TOTAL_BITS 40
 #define WHEEL_SPEED_BITS 10
 typedef struct {
@@ -40,7 +38,6 @@ typedef struct {
 	uint16_t rr : WHEEL_SPEED_BITS;
 } wheel_speeds_t;
 
-// units: percent
 #define SUS_DISPLACEMENTS_TOTAL_BITS 32
 #define SUS_DISPLACEMENT_BITS 8
 typedef struct {
@@ -50,7 +47,6 @@ typedef struct {
 	uint8_t rr : SUS_DISPLACEMENT_BITS;
 } suspension_displacements_t;
 
-// units: percent
 #define PEDAL_DATA_TOTAL_BITS 38
 #define PEDAL_BITS 7
 #define PRESSURE_BITS 12
@@ -84,6 +80,17 @@ typedef struct {
 	int32_t longitude : GPS_POS_BITS;
 } gps_lat_long_t;
 
+#define BATTERY_DATA_TOTAL_BITS 7
+#define BATTERY_BITS 7
+typedef struct {
+	uint8_t percentage : BATTERY_BITS;
+} battery_data_t;
+
+#define SD_LOGGING_DATA_TOTAL_BITS 1
+typedef struct {
+	uint8_t active : 1;
+} sd_logging_data_t;
+
 typedef struct {
 	cvt_data_t cvt_data;
 	wheel_speeds_t wheel_speeds;
@@ -92,29 +99,11 @@ typedef struct {
 	accelerometer_data_t accel_data;
 	gyroscope_data_t gyro_data;
 	gps_lat_long_t gps_pos;
+	battery_data_t battery_data;
+	sd_logging_data_t sd_logging_data;
 } baja_data_t;
 
-size_t pack_data(char *buffer, const baja_data_t *baja_data, const sent_data_points_t sent_data_points);
-sent_data_points_t unpack_data(const char *buffer, baja_data_t *baja_data);
-
-// unused
-/*void pack_all_data(char *buffer, 
-		const cvt_data_t *cvt_data, 
-		const wheel_speeds_t *wheel_speeds, 
-		const suspension_displacements_t *suspension_displacements, 
-		const pedal_data_t *pedal_data, 
-		const accelerometer_data_t *accelerometer_data, 
-		const gyroscope_data_t *gyroscope_data,
-		const gps_lat_long_diff_t *gps_pos_diff);
-
-void unpack_all_data(const char *buffer, 
-		cvt_data_t *cvt_data, 
-		wheel_speeds_t *wheel_speeds, 
-		suspension_displacements_t *suspension_displacements, 
-		pedal_data_t *pedal_data, 
-		accelerometer_data_t *accelerometer_data, 
-		gyroscope_data_t *gyroscope_data,
-		gps_lat_long_diff_t *gps_pos_diff);
-*/
+size_t pack_data(char* buffer, const baja_data_t* baja_data, const sent_data_points_t sent_data_points);
+sent_data_points_t unpack_data(const char* buffer, baja_data_t* baja_data);
 
 #endif

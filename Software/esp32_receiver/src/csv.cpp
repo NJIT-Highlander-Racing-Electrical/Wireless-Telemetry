@@ -2,130 +2,89 @@
 #include <stddef.h>
 #include "util.h"
 #include "baja_data_compression.h"
-//#include "gps.h"
+#include "csv.h"
+
+#define CSV_APPEND(fmt, ...) \
+    do { \
+        size_t _w = snprintf(buf, bufLen, fmt, ##__VA_ARGS__); \
+        buf += _w; bufLen -= _w; \
+    } while(0)
 
 int make_csv(char* buf, size_t bufLen, const rxdata_t rxdata) {
-	baja_data_t sortedData;
 
-	// this contains which data points we received on this packet
+	baja_data_t sortedData = {};
 	sent_data_points_t newDataPoints = unpack_data(rxdata.data, &sortedData);
 
-	// even worse than the other stuff
+	// indices 1-3: time
+	CSV_APPEND(",,,");
 
-	// there has to be a neater way to do this...
-	
-	// only print the stuff we just received, otherwise empty values for the csv
-	
+	// index 4: time from start
+	CSV_APPEND(",");
 
-	/*
-	 *	buf += written;
-	 *	bufLen -= written;
-	 *
-	 *  the first line moves our pointer so that the next time we write to the buffer
-	 *  it is appended after what we just wrote
-	 *  
-	 *  the second line makes sure we don't write past the buffer
-	 */
+	// index 5: screenshot flag
+	CSV_APPEND(",");
 
-	size_t written = snprintf(buf, bufLen, "BEGIN");
-	buf += written;
-	bufLen -= written;
+	// indices 6-7: battery voltage (no source), battery level
+	CSV_APPEND(",");
+	if (newDataPoints & BATTERY_DATA)
+		CSV_APPEND("%u,", sortedData.battery_data.percentage);
+	else
+		CSV_APPEND(",");
 
-	if(newDataPoints & CVT_DATA) {
-		cvt_data_t cvt = sortedData.cvt_data;
-		size_t written = snprintf(buf, bufLen, "%i,%i,%i,", cvt.primary, cvt.secondary, cvt.temperature);
-		buf += written;
-		bufLen -= written;	
-	} else {
-		size_t written = snprintf(buf, bufLen, ",,,");
-		buf += written;
-		bufLen -= written;
-	}
+	// indices 8-10: accelerometer
+	if (newDataPoints & ACCEL_DATA)
+		CSV_APPEND("%i,%i,%i,", sortedData.accel_data.x, sortedData.accel_data.y, sortedData.accel_data.z);
+	else
+		CSV_APPEND(",,,");
 
-	if(newDataPoints & WHEEL_SPEEDS) {
-		wheel_speeds_t wheel = sortedData.wheel_speeds;
-		size_t written = snprintf(buf, bufLen, "%i,%i,%i,%i,", wheel.fl, wheel.fr, wheel.rl, wheel.rr);
-		buf += written;
-		bufLen -= written;
-	} else {
-		size_t written = snprintf(buf, bufLen, ",,,,");
-		buf += written;
-		bufLen -= written;
-	}
+	// indices 11-13: unused
+	CSV_APPEND(",,,");
 
-	if(newDataPoints & SUS_DISPLACEMENTS) {
-		suspension_displacements_t sus = sortedData.sus_displacements;
-		size_t written = snprintf(buf, bufLen, "%i,%i,%i,%i,", sus.fl, sus.fr, sus.rl, sus.rr);
-		buf += written;
-		bufLen -= written;
-	} else {
-		size_t written = snprintf(buf, bufLen, ",,,,");
-		buf += written;
-		bufLen -= written;
-	}
+	// indices 14-15: GPS lat/lon
+	if (newDataPoints & GPS_LAT_LONG)
+		CSV_APPEND("%.6f,%.6f,", sortedData.gps_pos.latitude / 100000.0f, sortedData.gps_pos.longitude / 100000.0f);
+	else
+		CSV_APPEND(",,");
 
-	if(newDataPoints & PEDAL_DATA) {
-		pedal_data_t pedal = sortedData.pedal_data;
-		size_t written = snprintf(buf, bufLen, "%i,%i,%i,%i,", pedal.gas, pedal.brake, pedal.frontPressure, pedal.rearPressure);
-		buf += written;
-		bufLen -= written;
-	} else {
-		size_t written = snprintf(buf, bufLen, ",,,,");
-		buf += written;
-		bufLen -= written;
-	}
+	// indices 16-20: GPS status fields
+	CSV_APPEND(",,,,,");
 
-	if(newDataPoints & ACCEL_DATA) {
-		accelerometer_data_t accel = sortedData.accel_data;
-		size_t written = snprintf(buf, bufLen, "%i,%i,%i,", accel.x, accel.y, accel.z);
-		buf += written;
-		bufLen -= written;
-	} else {
-		size_t written = snprintf(buf, bufLen, ",,,");
-		buf += written;
-		bufLen -= written;
-	}
-	
-	if(newDataPoints & GYRO_DATA) {
-		gyroscope_data_t gyro = sortedData.gyro_data;
-		size_t written = snprintf(buf, bufLen, "%i,%i,%i,", gyro.yaw, gyro.pitch, gyro.roll);
-		buf += written;
-		bufLen -= written;	
-	} else {
-		size_t written = snprintf(buf, bufLen, ",,,");
-		buf += written;
-		bufLen -= written;
-	}
+	// indices 21-22: CVT RPM
+	if (newDataPoints & CVT_DATA)
+		CSV_APPEND("%u,%u,", sortedData.cvt_data.primary, sortedData.cvt_data.secondary);
+	else
+		CSV_APPEND(",,");
 
-	/*if(newDataPoints & GPS_LAT_LONG) {
-		
-	}
+	// indices 23-25: CVT temperatures
+	if (newDataPoints & CVT_DATA)
+		CSV_APPEND("%u,%u,%u,", sortedData.cvt_data.temperature, sortedData.cvt_data.secondaryTemperature, sortedData.cvt_data.beltTemperature);
+	else
+		CSV_APPEND(",,,");
 
-	if(newDataPoints & GPS_LAT_LONG_CONST) {
+	// indices 26-29: wheel speeds
+	if (newDataPoints & WHEEL_SPEEDS)
+		CSV_APPEND("%u,%u,%u,%u,", sortedData.wheel_speeds.fl, sortedData.wheel_speeds.fr, sortedData.wheel_speeds.rl, sortedData.wheel_speeds.rr);
+	else
+		CSV_APPEND(",,,,");
 
-	}*/
+	// indices 30-33: suspension displacements
+	if (newDataPoints & SUS_DISPLACEMENTS)
+		CSV_APPEND("%u,%u,%u,%u,", sortedData.sus_displacements.fl, sortedData.sus_displacements.fr, sortedData.sus_displacements.rl, sortedData.sus_displacements.rr);
+	else
+		CSV_APPEND(",,,,");
 
-	if(newDataPoints & GPS_LAT_LONG) {
-		gps_lat_long_t gps = sortedData.gps_pos;
-		size_t written = snprintf(buf, bufLen, "%.6f,%.6f,", gps.latitude / 100000.f, gps.longitude / 100000.f);
-		buf += written;
-		bufLen -= written;
-	} else {
-		size_t written = snprintf(buf, bufLen, ",,");
-		buf += written;
-		bufLen -= written;
-	}
+	// indices 34-35: brake pressures
+	if (newDataPoints & PEDAL_DATA)
+		CSV_APPEND("%u,%u,", sortedData.pedal_data.frontPressure, sortedData.pedal_data.rearPressure);
+	else
+		CSV_APPEND(",,");
 
-	if(newDataPoints & GPS_OTHER_DATA) {
+	// index 36: unused
+	CSV_APPEND(",");
 
-	}
-
-	written = snprintf(buf, bufLen, "END");
-	buf += written;
-	bufLen -= written;
-
-	// I forget why this is here, shouldn't it screw up the first char of the buf?
-	buf[0] = '\0';
+	// index 37: SD logging
+	if (newDataPoints & SD_LOGGING_DATA)
+		CSV_APPEND("%u", sortedData.sd_logging_data.active);
 
 	return 1;
 }
